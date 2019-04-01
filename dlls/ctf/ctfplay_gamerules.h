@@ -15,6 +15,8 @@
 #ifndef CTFPLAY_GAMERULES_H
 #define CTFPLAY_GAMERULES_H
 
+#include "CTFDefs.h"
+
 /**
 *	@brief Opposing Force CTF gamemode rules
 */
@@ -94,7 +96,7 @@ public:
 	void GoToIntermission() override;
 
 private:
-	void SendTeamStatInfo( int iTeamNum );
+	void SendTeamStatInfo( CTFTeam iTeamNum );
 	void SendPlayerStatInfo( CBasePlayer* pPlayer );
 
 	void RecountTeams();
@@ -104,8 +106,20 @@ private:
 	bool m_DisableDeathPenalty = false;
 	bool m_fRefreshScores = false;
 	float m_flNextStatsSend;
-	StatsPhase m_iStatsPhase = StatsPhase::SendTeam0;
-	int m_iStatsPlayer;
+	StatsPhase m_iStatsPhase = StatsPhase::Nothing;
+	//Use a sane default to avoid lockups
+	int m_iStatsPlayer = 1;
 };
+
+extern char* pszPlayerIPs[ SV_MAX_PLAYERS * 2 ];
+
+const char* GetTeamName( edict_t *pEntity );
+
+void GetLosingTeam( int& iTeamNum, int& iScoreDiff );
+
+void RespawnPlayerCTFPowerups( CBasePlayer* pPlayer, bool bForceRespawn );
+void ScatterPlayerCTFPowerups( CBasePlayer* pPlayer );
+void DropPlayerCTFPowerup( CBasePlayer* pPlayer );
+void FlushCTFPowerupTimes();
 
 #endif

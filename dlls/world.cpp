@@ -34,6 +34,7 @@
 #include "gamerules.h"
 #include "teamplay_gamerules.h"
 #include "world.h"
+#include "ctf/CItemCTF.h"
 
 extern CGraph WorldGraph;
 extern CSoundEnt *pSoundEnt;
@@ -479,6 +480,8 @@ void CWorld :: Spawn( void )
 {
 	g_fGameOver = FALSE;
 	Precache( );
+	CItemCTF::m_pLastSpawn = nullptr;
+	//TODO: needs some ctf specific code
 	g_flWeaponCheat = CVAR_GET_FLOAT( "sv_cheats" );  // Is the impulse 101 command allowed?
 }
 
@@ -740,6 +743,14 @@ void CWorld :: KeyValue( KeyValueData *pkvd )
 		if ( atoi(pkvd->szValue) )
 		{
 			pev->spawnflags |= SF_WORLD_FORCETEAM;
+		}
+		pkvd->fHandled = TRUE;
+	}
+	else if( FStrEq( pkvd->szKeyName, "defaultctf" ) )
+	{
+		if( atoi( pkvd->szValue ) )
+		{
+			pev->spawnflags |= SF_WORLD_CTF;
 		}
 		pkvd->fHandled = TRUE;
 	}

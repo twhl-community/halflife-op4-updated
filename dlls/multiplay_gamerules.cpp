@@ -28,15 +28,11 @@
 #include	"voice_gamemgr.h"
 #include	"hltv.h"
 
+#include "ctf/ctfplay_gamerules.h"
+
 #if !defined ( _WIN32 )
 #include <ctype.h>
 #endif
-
-#include "CItemAcceleratorCTF.h"
-#include "CItemBackpackCTF.h"
-#include "CItemLongJumpCTF.h"
-#include "CItemPortableHEVCTF.h"
-#include "CItemRegenerationCTF.h"
 
 extern DLL_GLOBAL CGameRules	*g_pGameRules;
 extern DLL_GLOBAL BOOL	g_fGameOver;
@@ -398,6 +394,53 @@ BOOL CHalfLifeMultiplay :: GetNextBestWeapon( CBasePlayer *pPlayer, CBasePlayerI
 BOOL CHalfLifeMultiplay :: ClientConnected( edict_t *pEntity, const char *pszName, const char *pszAddress, char szRejectReason[ 128 ] )
 {
 	g_VoiceGameMgr.ClientConnected(pEntity);
+
+	int playersInTeamsCount = 0;
+
+	for( int iPlayer = 1; iPlayer <= gpGlobals->maxClients; ++iPlayer )
+	{
+		auto pPlayer = static_cast< CBasePlayer* >( UTIL_PlayerByIndex( iPlayer ) );
+
+		if( pPlayer )
+		{
+			if( pPlayer->IsPlayer() )
+			{
+				playersInTeamsCount += ( pPlayer->m_iTeamNum > CTFTeam::None ) ? 1 : 0;
+			}
+		}
+	}
+
+	if( playersInTeamsCount <= 1 )
+	{
+		for( int iPlayer = 1; iPlayer <= gpGlobals->maxClients; ++iPlayer )
+		{
+			auto pPlayer = static_cast<CBasePlayer*>( UTIL_PlayerByIndex( iPlayer ) );
+
+			if( pPlayer && pPlayer->m_iItems != CTFItem::None )
+			{
+				if( pPlayer->m_iItems & CTFItem::ItemsMask )
+				{
+					RespawnPlayerCTFPowerups( pPlayer, true );
+				}
+
+				ClientPrint( pPlayer->pev, HUD_PRINTCENTER, "#CTFGameReset" );
+			}
+		}
+	}
+
+	if( pEntity )
+	{
+		//TODO: really shouldn't be modifying this directly
+		auto portNumber = strchr( const_cast<char*>( pszAddress ), ':' );
+
+		if( portNumber )
+			*portNumber = '\0';
+
+		pszPlayerIPs[ ENTINDEX( pEntity ) ] = strdup( pszAddress );
+	}
+
+	trace_line( "CHalfLifeMultiplay :: ClientConnected  g_pGameRules->IsMultiplayer()[%d] address[%s]\n", IsMultiplayer(), pszAddress );
+
 	return TRUE;
 }
 
@@ -484,6 +527,9 @@ void CHalfLifeMultiplay :: ClientDisconnected( edict_t *pClient )
 
 		if ( pPlayer )
 		{
+			if( !g_fGameOver && pPlayer->m_iItems & CTFItem::ItemsMask )
+				ScatterPlayerCTFPowerups( pPlayer );
+
 			FireTargets( "game_playerleave", pPlayer, pPlayer, USE_TOGGLE, 0 );
 
 			// team match?
@@ -671,6 +717,11 @@ void CHalfLifeMultiplay :: PlayerKilled( CBasePlayer *pVictim, entvars_t *pKille
 		DeactivateSatchels( pVictim );
 	}
 #endif
+
+	if( pVictim->IsPlayer() && !g_fGameOver && ( pVictim->m_iItems & CTFItem::ItemsMask ) )
+	{
+		ScatterPlayerCTFPowerups( pVictim );
+	}
 }
 
 //=========================================================
@@ -1137,63 +1188,12 @@ BOOL CHalfLifeMultiplay :: FAllowMonsters( void )
 //======== CHalfLifeMultiplay private functions ===========
 #define INTERMISSION_TIME		6
 
-void FlushCTFPowerupTimes()
-{
-	for( auto pItem : UTIL_FindEntitiesByClassname<CItemCTF>( "item_ctflongjump" ) )
-	{
-		auto pPlayer = GET_PRIVATE<CBasePlayer>( pItem->pev->owner );
-
-		if( pPlayer && pPlayer->IsPlayer() )
-		{
-			pPlayer->m_flJumpTime += gpGlobals->time - pItem->m_flPickupTime;
-		}
-	}
-
-	for( auto pItem : UTIL_FindEntitiesByClassname<CItemPortableHEVCTF>( "item_ctfportablehev" ) )
-	{
-		auto pPlayer = GET_PRIVATE<CBasePlayer>( pItem->pev->owner );
-
-		if( pPlayer && pPlayer->IsPlayer() )
-		{
-			pPlayer->m_flShieldTime += gpGlobals->time - pItem->m_flPickupTime;
-		}
-	}
-
-	for( auto pItem : UTIL_FindEntitiesByClassname<CItemRegenerationCTF>( "item_ctfregeneration" ) )
-	{
-		auto pPlayer = GET_PRIVATE<CBasePlayer>( pItem->pev->owner );
-
-		if( pPlayer && pPlayer->IsPlayer() )
-		{
-			pPlayer->m_flHealthTime += gpGlobals->time - pItem->m_flPickupTime;
-		}
-	}
-
-	for( auto pItem : UTIL_FindEntitiesByClassname<CItemBackpackCTF>( "item_ctfbackpack" ) )
-	{
-		auto pPlayer = GET_PRIVATE<CBasePlayer>( pItem->pev->owner );
-
-		if( pPlayer && pPlayer->IsPlayer() )
-		{
-			pPlayer->m_flBackpackTime += gpGlobals->time - pItem->m_flPickupTime;
-		}
-	}
-
-	for( auto pItem : UTIL_FindEntitiesByClassname<CItemAcceleratorCTF>( "item_ctfaccelerator" ) )
-	{
-		auto pPlayer = GET_PRIVATE<CBasePlayer>( pItem->pev->owner );
-
-		if( pPlayer && pPlayer->IsPlayer() )
-		{
-			pPlayer->m_flAccelTime += gpGlobals->time - pItem->m_flPickupTime;
-		}
-	}
-}
-
 void CHalfLifeMultiplay :: GoToIntermission( void )
 {
 	if ( g_fGameOver )
 		return;  // intermission has already been triggered, so ignore.
+
+	FlushCTFPowerupTimes();
 
 	MESSAGE_BEGIN(MSG_ALL, SVC_INTERMISSION);
 	MESSAGE_END();

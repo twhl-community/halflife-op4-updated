@@ -302,6 +302,11 @@ extern void ClientPrint( entvars_t *client, int msg_dest, const char *msg_name, 
 extern void			UTIL_SayText( const char *pText, CBaseEntity *pEntity );
 extern void			UTIL_SayTextAll( const char *pText, CBaseEntity *pEntity );
 
+//TODO: Does nothing in a release build, might log to a file in a debug build
+//TODO: add the other usage from GameDLLInit
+inline void trace_line( const char* str, ... )
+{
+}
 
 typedef struct hudtextparms_s
 {
@@ -546,6 +551,21 @@ inline void WRITE_COORD_VECTOR( const Vector& vec )
 	WRITE_COORD( vec.z );
 }
 
+struct MinuteSecondTime
+{
+	const int Minutes;
+	const int Seconds;
+};
+
+/**
+*	@brief Converts seconds to minutes and seconds
+*/
+inline MinuteSecondTime SecondsToTime( const int seconds )
+{
+	const auto minutes = seconds / 60;
+	return { minutes, seconds - ( minutes * 60 ) };
+}
+
 template<typename T>
 struct FindByClassnameFunctor
 {
@@ -664,7 +684,7 @@ public:
 
 	iterator begin()
 	{
-		return { m_pszName, static_cast< T* >( Functor( m_pStartEntity, m_pszName ) ) };
+		return { m_pszName, static_cast< T* >( Functor::Find( m_pStartEntity, m_pszName ) ) };
 	}
 
 	iterator end()

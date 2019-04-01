@@ -33,6 +33,7 @@
 #include "shake.h"
 #include "decals.h"
 #include "gamerules.h"
+#include "ctf/ctfplay_gamerules.h"
 #include "game.h"
 #include "pm_shared.h"
 #include "hltv.h"
@@ -53,7 +54,7 @@ BOOL gInitHUD = TRUE;
 extern void CopyToBodyQue(entvars_t* pev);
 extern void respawn(entvars_t *pev, BOOL fCopyCorpse);
 extern Vector VecBModelOrigin(entvars_t *pevBModel );
-extern edict_t *EntSelectSpawnPoint( CBaseEntity *pPlayer );
+extern edict_t *EntSelectSpawnPoint( CBasePlayer *pPlayer );
 
 // the world node graph
 extern CGraph	WorldGraph;
@@ -1049,6 +1050,33 @@ void CBasePlayer::SetAnimation( PLAYER_ANIM playerAnim )
 		else
 		{
 			m_IdealActivity = ACT_WALK;
+		}
+		break;
+
+	case PLAYER_GRAPPLE:
+		{
+			if( FBitSet( pev->flags, FL_ONGROUND ) )
+			{
+				if( pev->waterlevel > 1 )
+				{
+					if( speed == 0 )
+						m_IdealActivity = ACT_HOVER;
+					else
+						m_IdealActivity = ACT_SWIM;
+				}
+				else
+				{
+					m_IdealActivity = ACT_WALK;
+				}
+			}
+			else if( speed == 0 )
+			{
+				m_IdealActivity = ACT_HOVER;
+			}
+			else
+			{
+				m_IdealActivity = ACT_SWIM;
+			}
 		}
 		break;
 	}
@@ -2933,12 +2961,80 @@ Returns the entity to spawn at
 USES AND SETS GLOBAL g_pLastSpawn
 ============
 */
-edict_t *EntSelectSpawnPoint( CBaseEntity *pPlayer )
+edict_t *EntSelectSpawnPoint( CBasePlayer *pPlayer )
 {
 	CBaseEntity *pSpot;
 	edict_t		*player;
 
 	player = pPlayer->edict();
+
+	if( g_pGameRules->IsCTF() && pPlayer->m_iTeamNum != CTFTeam::None )
+	{
+		const auto pszTeamSpotName = pPlayer->m_iTeamNum == CTFTeam::BlackMesa ? "ctfs1" : "ctfs2";
+
+		pSpot = g_pLastSpawn;
+		// Randomize the start spot
+		for( int i = RANDOM_LONG( 1, 5 ); i > 0; i-- )
+			pSpot = UTIL_FindEntityByClassname( pSpot, pszTeamSpotName );
+		if( FNullEnt( pSpot ) )  // skip over the null point
+			pSpot = UTIL_FindEntityByClassname( pSpot, pszTeamSpotName );
+
+		CBaseEntity *pFirstSpot = pSpot;
+
+		do
+		{
+			if( pSpot )
+			{
+				// check if pSpot is valid
+				if( IsSpawnPointValid( pPlayer, pSpot ) && pSpot->pev->origin != g_vecZero )
+				{
+					// if so, go to pSpot
+					goto ReturnSpot;
+				}
+			}
+			// increment pSpot
+			pSpot = UTIL_FindEntityByClassname( pSpot, pszTeamSpotName );
+		}
+		while( pSpot != pFirstSpot ); // loop if we're not back to the start
+
+		//Try a shared spawn spot
+		// Randomize the start spot
+		for( int i = RANDOM_LONG( 1, 5 ); i > 0; i-- )
+			pSpot = UTIL_FindEntityByClassname( pSpot, "ctfs0" );
+		if( FNullEnt( pSpot ) )  // skip over the null point
+			pSpot = UTIL_FindEntityByClassname( pSpot, "ctfs0" );
+
+		pFirstSpot = pSpot;
+
+		do
+		{
+			if( pSpot )
+			{
+				// check if pSpot is valid
+				if( IsSpawnPointValid( pPlayer, pSpot ) && pSpot->pev->origin != g_vecZero )
+				{
+					// if so, go to pSpot
+					goto ReturnSpot;
+				}
+			}
+			// increment pSpot
+			pSpot = UTIL_FindEntityByClassname( pSpot, "ctfs0" );
+		}
+		while( pSpot != pFirstSpot ); // loop if we're not back to the start
+
+		// we haven't found a place to spawn yet,  so kill any guy at the first spawn point and spawn there
+		if( !FNullEnt( pSpot ) )
+		{
+			CBaseEntity *ent = NULL;
+			while( ( ent = UTIL_FindEntityInSphere( ent, pSpot->pev->origin, 128 ) ) != NULL )
+			{
+				// if ent is a client, kill em (unless they are ourselves)
+				if( ent->IsPlayer() && !( ent->edict() == player ) )
+					ent->TakeDamage( VARS( INDEXENT( 0 ) ), VARS( INDEXENT( 0 ) ), 300, DMG_GENERIC );
+			}
+			goto ReturnSpot;
+		}
+	}
 
 // choose a info_player_deathmatch point
 	if (g_pGameRules->IsCoOp())
@@ -3070,7 +3166,14 @@ void CBasePlayer::Spawn( void )
 // dont let uninitialized value here hurt the player
 	m_flFallVelocity = 0;
 
-	g_pGameRules->SetDefaultPlayerTeam( this );
+	if( !g_pGameRules->IsCTF() )
+		g_pGameRules->SetDefaultPlayerTeam( this );
+
+	if( !g_pGameRules->IsCTF() && m_iTeamNum == CTFTeam::None )
+	{
+		pev->iuser1 = OBS_ROAMING;
+	}
+
 	g_pGameRules->GetPlayerSpawnSpot( this );
 
     SET_MODEL(ENT(pev), "models/player.mdl");
@@ -3108,10 +3211,41 @@ void CBasePlayer::Spawn( void )
 	}
 
 	m_lastx = m_lasty = 0;
-	
+	m_iLastDamage = 0;
+	m_bIsClimbing = false;
+	m_flLastDamageTime = 0;
+
 	m_flNextChatTime = gpGlobals->time;
 
 	g_pGameRules->PlayerSpawn( this );
+
+	if( g_pGameRules->IsCTF() && m_iTeamNum == CTFTeam::None )
+	{
+		pev->effects |= EF_NODRAW;
+		pev->iuser1 = OBS_ROAMING;
+		pev->solid = SOLID_NOT;
+		pev->movetype = MOVETYPE_NOCLIP;
+		pev->takedamage = DAMAGE_NO;
+		m_iHideHUD = HIDEHUD_WEAPONS | HIDEHUD_HEALTH;
+		m_afPhysicsFlags |= PFLAG_OBSERVER;
+		pev->flags |= FL_SPECTATOR;
+
+		MESSAGE_BEGIN( MSG_ALL, gmsgSpectator );
+		WRITE_BYTE( entindex() );
+		WRITE_BYTE( 1 );
+		MESSAGE_END();
+
+		MESSAGE_BEGIN( MSG_ONE, gmsgTeamFull, nullptr, edict() );
+		WRITE_BYTE( 0 );
+		MESSAGE_END();
+
+		m_pGoalEnt = nullptr;
+
+		m_iCurrentMenu = 2 * ( m_iNewTeamNum > CTFTeam::None ) + 1;
+
+		if( g_pGameRules->IsCoOp() )
+			Player_Menu();
+	}
 }
 
 
@@ -3667,6 +3801,12 @@ void CBasePlayer::ImpulseCommands( )
 
 		break;
 
+	case 205:
+		{
+			DropPlayerCTFPowerup( this );
+			break;
+		}
+
 	default:
 		// check all of the cheat impulse commands now
 		CheatImpulseCommands( iImpulse );
@@ -3740,6 +3880,7 @@ void CBasePlayer::CheatImpulseCommands( int iImpulse )
 		GiveNamedItem( "weapon_knife" );
 		GiveNamedItem( "weapon_m249" );
 		GiveNamedItem( "weapon_pipewrench" );
+		GiveNamedItem( "weapon_grapple" );
 		GiveNamedItem( "weapon_sniperrifle" );
 		GiveNamedItem( "weapon_displacer" );
 		//TODO: not given

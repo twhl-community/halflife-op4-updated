@@ -17,6 +17,7 @@
 
 
 #include "pm_materials.h"
+#include "ctf/CTFDefs.h"
 
 class CRope;
 
@@ -38,30 +39,6 @@ class CRope;
 #define		PFLAG_USING			( 1<<4 )		// Using a continuous entity
 #define		PFLAG_OBSERVER		( 1<<5 )		// player is locked in stationary cam mode. Spectators can move, observers can't.
 #define		PFLAG_ONROPE		( 1<<6 )
-
-enum class CTFTeam
-{
-	None = 0,
-	BlackMesa,
-	OpposingForce
-};
-
-enum class CTFItem : unsigned int
-{
-	None = 0,
-
-	BlackMesaFlag = 1 << 0,
-	OpposingForceFlag = 1 << 1,
-
-	LongJump = 1 << 2,
-	PortableHEV = 1 << 3,
-	Backpack = 1 << 4,
-	Acceleration = 1 << 5,
-	Unknown = 1 << 6, //Appears to be some non-existent item
-	Regeneration = 1 << 7,
-
-	ItemsMask = LongJump | PortableHEV | Backpack | Acceleration | Unknown | Regeneration
-};
 
 //
 // generic player
@@ -97,6 +74,7 @@ typedef enum
 	PLAYER_SUPERJUMP,
 	PLAYER_DIE,
 	PLAYER_ATTACK1,
+	PLAYER_GRAPPLE,
 } PLAYER_ANIM;
 
 #define MAX_ID_RANGE 2048
@@ -213,7 +191,7 @@ public:
 	char* m_szTeamModel;
 	CTFTeam m_iTeamNum;
 	CTFTeam m_iNewTeamNum;
-	CTFItem m_iItems;
+	CTFItem::CTFItem m_iItems;
 	unsigned int m_iClientItems;
 	EHANDLE m_pFlag;
 	int m_iCurrentMenu;

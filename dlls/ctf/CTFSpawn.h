@@ -12,22 +12,25 @@
 *   without written permission from Valve LLC.
 *
 ****/
-#ifndef CITEMCTF_H
-#define CITEMCTF_H
+#ifndef CTFSPAWN_H
+#define CTFSPAWN_H
 
-//TODO: implement
-class CItemCTF : public CBaseAnimating
+#include "CTFDefs.h"
+
+class CTFSpawn : public CBaseEntity
 {
 public:
-	void DropItem( CBasePlayer* pPlayer, bool bForceRespawn ) {}
-	void ScatterItem( CBasePlayer* pPlayer ) {}
+	int Classify() override { return CLASS_NONE; }
 
-	int team_no;
-	int m_iLastTouched;
-	float m_flNextTouchTime;
-	float m_flPickupTime;
-	unsigned int m_iItemFlag;
-	const char* m_pszItemName;
+	void KeyValue( KeyValueData* pkvd ) override;
+
+	void Spawn() override;
+
+	BOOL IsTriggered( CBaseEntity* pEntity ) override;
+
+	CTFTeam team_no;
+	bool m_fState;
 };
+
 
 #endif

@@ -12,15 +12,22 @@
 *   without written permission from Valve LLC.
 *
 ****/
-#ifndef CITEMACCELERATORCTF_H
-#define CITEMACCELERATORCTF_H
+#include "extdll.h"
+#include "util.h"
+#include "cbase.h"
+#include "CItemSpawnCTF.h"
 
-#include "CItemCTF.h"
+LINK_ENTITY_TO_CLASS( info_ctfspawn_pickup, CItemSpawnCTF );
 
-//TODO: implement
-class CItemAcceleratorCTF : public CItemCTF
+void CItemSpawnCTF::KeyValue( KeyValueData* pkvd )
 {
-public:
-};
-
-#endif
+	if( FStrEq( "team_no", pkvd->szKeyName ) )
+	{
+		team_no = static_cast<CTFTeam>( atoi( pkvd->szValue ) );
+		pkvd->fHandled = true;
+	}
+	else
+	{
+		CPointEntity::KeyValue( pkvd );
+	}
+}
