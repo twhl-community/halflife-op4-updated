@@ -106,9 +106,11 @@ HLDLL_OBJS = \
 	$(HLDLL_OBJ_DIR)/gargantua.o \
 	$(HLDLL_OBJ_DIR)/gauss.o \
 	$(HLDLL_OBJ_DIR)/genericmonster.o \
+	$(HLDLL_OBJ_DIR)/geneworm.o \
 	$(HLDLL_OBJ_DIR)/ggrenade.o \
 	$(HLDLL_OBJ_DIR)/glock.o \
 	$(HLDLL_OBJ_DIR)/gman.o \
+	$(HLDLL_OBJ_DIR)/gonome.o \
 	$(HLDLL_OBJ_DIR)/h_ai.o \
 	$(HLDLL_OBJ_DIR)/h_battery.o \
 	$(HLDLL_OBJ_DIR)/h_cine.o \
