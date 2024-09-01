@@ -992,8 +992,10 @@ int PM_FlyMove()
 
 		// modify original_velocity so it parallels all of the clip planes
 		//
-		if (pmove->movetype == MOVETYPE_WALK &&
-			((pmove->onground == -1) || (pmove->friction != 1))) // relfect player velocity
+		// relfect player velocity
+		// Only give this a try for first impact plane because you can get yourself stuck in an acute corner by jumping in place
+		//  and pressing forward and nobody was really using this bounce/reflection feature anyway...
+		if (numplanes == 1 && pmove->movetype == MOVETYPE_WALK && ((pmove->onground == -1) || (pmove->friction != 1)))
 		{
 			for (i = 0; i < numplanes; i++)
 			{
@@ -1771,9 +1773,9 @@ bool PM_CheckStuck()
 	VectorCopy(pmove->origin, base);
 
 	//
-	// Deal with precision error in network.
+	// Deal with precision error in network and cases where the player can get stuck on level transitions in singleplayer.
 	//
-	if (0 == pmove->server)
+	if (0 == pmove->server || 0 == pmove->multiplayer)
 	{
 		// World or BSP model
 		if ((hitent == 0) ||
@@ -1797,8 +1799,6 @@ bool PM_CheckStuck()
 			} while (nReps < 54);
 		}
 	}
-
-	// Only an issue on the client.
 
 	// Always check if we've just changed levels.
 	if (!(pmove->server != 0 && g_CheckForPlayerStuck))
@@ -2942,7 +2942,7 @@ void PM_DropPunchAngle(Vector& punchangle)
 
 	len = VectorNormalize(punchangle);
 	len -= (10.0 + len * 0.5) * pmove->frametime;
-	len = V_max(len, 0.0);
+	len = V_max(len, 0.0f);
 	VectorScale(punchangle, len, punchangle);
 }
 
@@ -2967,6 +2967,15 @@ void PM_CheckParamters()
 	if (maxspeed != 0.0)
 	{
 		pmove->maxspeed = V_min(maxspeed, pmove->maxspeed);
+	}
+
+	// Slow down, I'm pulling it! (a box maybe) but only when I'm standing on ground
+	//
+	// JoshA: Moved this to CheckParamters rather than working on the velocity,
+	// as otherwise it affects every integration step incorrectly.
+	if ((pmove->onground != -1) && (pmove->cmd.buttons & IN_USE))
+	{
+		pmove->maxspeed *= 1.0f / 3.0f;
 	}
 
 	if ((spd != 0.0) &&
@@ -3093,7 +3102,13 @@ void PM_PlayerMove(qboolean server)
 	{
 		if (PM_CheckStuck())
 		{
-			return; // Can't move, we're stuck
+			// Let the user try to duck to get unstuck
+			PM_Duck();
+
+			if (PM_CheckStuck())
+			{
+				return; // Can't move, we're stuck
+			}
 		}
 	}
 
@@ -3138,12 +3153,6 @@ void PM_PlayerMove(qboolean server)
 			//  it will be set immediately again next frame if necessary
 			pmove->movetype = MOVETYPE_WALK;
 		}
-	}
-
-	// Slow down, I'm pulling it! (a box maybe) but only when I'm standing on ground
-	if ((pmove->onground != -1) && (pmove->cmd.buttons & IN_USE) != 0)
-	{
-		VectorScale(pmove->velocity, 0.3, pmove->velocity);
 	}
 
 	// Handle movement

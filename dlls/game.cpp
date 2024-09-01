@@ -47,12 +47,6 @@ cvar_t mp_chattime = {"mp_chattime", "10", FCVAR_SERVER};
 
 cvar_t sv_allowbunnyhopping = {"sv_allowbunnyhopping", "0", FCVAR_SERVER};
 
-// Engine Cvars
-cvar_t* g_psv_gravity = NULL;
-cvar_t* g_psv_aim = NULL;
-cvar_t* g_footsteps = NULL;
-cvar_t* g_psv_cheats = nullptr;
-
 //Macros to make skill cvars easier to define
 #define DECLARE_SKILL_CVARS(name)                 \
 	cvar_t sk_##name##1 = {"sk_" #name "1", "0"}; \
@@ -579,6 +573,8 @@ cvar_t sk_player_leg3 = {"sk_player_leg3", "1"};
 
 // END Cvars for Skill Level settings
 
+cvar_t sv_pushable_fixed_tick_fudge = {"sv_pushable_fixed_tick_fudge", "15"};
+
 // BEGIN Opposing Force variables
 
 cvar_t ctfplay = {"mp_ctfplay", "0", FCVAR_SERVER};
@@ -623,6 +619,7 @@ void GameDLLInit()
 
 	g_psv_gravity = CVAR_GET_POINTER("sv_gravity");
 	g_psv_aim = CVAR_GET_POINTER("sv_aim");
+	g_psv_allow_autoaim = CVAR_GET_POINTER("sv_allow_autoaim");
 	g_footsteps = CVAR_GET_POINTER("mp_footsteps");
 	g_psv_cheats = CVAR_GET_POINTER("sv_cheats");
 
@@ -1176,6 +1173,8 @@ void GameDLLInit()
 	CVAR_REGISTER(&sk_player_leg2);
 	CVAR_REGISTER(&sk_player_leg3);
 	// END REGISTER CVARS FOR SKILL LEVEL STUFF
+
+	CVAR_REGISTER(&sv_pushable_fixed_tick_fudge);
 
 	// BEGIN REGISTER CVARS FOR OPPOSING FORCE
 

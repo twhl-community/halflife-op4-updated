@@ -883,7 +883,7 @@ public:
 
 	int m_iTrail;
 	float m_flIgniteTime;
-	EHANDLE m_pLauncher; // handle back to the launcher that fired me.
+	EHANDLE m_hLauncher; // handle back to the launcher that fired me.
 };
 
 #define GAUSS_PRIMARY_CHARGE_VOLUME 256 // how loud gauss is while charging

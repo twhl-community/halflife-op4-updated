@@ -38,6 +38,10 @@ extern cvar_t teamlist;
 extern cvar_t teamoverride;
 extern cvar_t defaultteam;
 extern cvar_t allowmonsters;
+extern cvar_t allow_spectators;
+extern cvar_t mp_chattime;
+
+extern cvar_t sv_allowbunnyhopping;
 
 extern cvar_t ctf_capture;
 extern cvar_t oldweapons;
@@ -47,12 +51,9 @@ extern cvar_t coopplay;
 extern cvar_t coopweprespawn;
 extern cvar_t spamdelay;
 
-extern cvar_t sv_allowbunnyhopping;
-
 // Engine Cvars
-extern cvar_t* g_psv_gravity;
-extern cvar_t* g_psv_aim;
-extern cvar_t* g_footsteps;
-extern cvar_t* g_psv_cheats;
-extern cvar_t allow_spectators;
-extern cvar_t mp_chattime;
+inline cvar_t* g_psv_gravity;
+inline cvar_t* g_psv_aim;
+inline cvar_t* g_psv_allow_autoaim;
+inline cvar_t* g_footsteps;
+inline cvar_t* g_psv_cheats;

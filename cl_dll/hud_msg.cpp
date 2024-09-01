@@ -31,7 +31,6 @@ extern int giTeamplay;
 
 extern BEAM* pBeam;
 extern BEAM* pBeam2;
-extern TEMPENTITY* pFlare; // Vit_amiN
 
 
 /// USER-DEFINED SERVER MESSAGE HANDLERS
@@ -88,7 +87,6 @@ void CHud::MsgFunc_InitHUD(const char* pszName, int iSize, void* pbuf)
 
 	//Probably not a good place to put this.
 	pBeam = pBeam2 = NULL;
-	pFlare = NULL; // Vit_amiN: clear egon's beam flare
 }
 
 
@@ -111,6 +109,15 @@ bool CHud::MsgFunc_GameMode(const char* pszName, int iSize, void* pbuf)
 			gViewPort->HideScoreBoard();
 		}
 	}
+
+#ifdef STEAM_RICH_PRESENCE
+	if (m_Teamplay)
+		gEngfuncs.pfnClientCmd("richpresence_gamemode Teamplay\n");
+	else
+		gEngfuncs.pfnClientCmd("richpresence_gamemode\n"); // reset
+
+	gEngfuncs.pfnClientCmd("richpresence_update\n");
+#endif
 
 	return true;
 }

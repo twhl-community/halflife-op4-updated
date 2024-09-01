@@ -86,10 +86,10 @@ LINK_ENTITY_TO_CLASS(rpg_rocket, CRpgRocket);
 
 CRpgRocket::~CRpgRocket()
 {
-	if (m_pLauncher)
+	if (m_hLauncher)
 	{
 		// my launcher is still around, tell it I'm dead.
-		static_cast<CRpg*>(static_cast<CBaseEntity*>(m_pLauncher))->m_cActiveRockets--;
+		static_cast<CRpg*>(static_cast<CBaseEntity*>(m_hLauncher))->m_cActiveRockets--;
 	}
 }
 
@@ -103,7 +103,7 @@ CRpgRocket* CRpgRocket::CreateRpgRocket(Vector vecOrigin, Vector vecAngles, CBas
 	pRocket->pev->angles = vecAngles;
 	pRocket->Spawn();
 	pRocket->SetTouch(&CRpgRocket::RocketTouch);
-	pRocket->m_pLauncher = pLauncher; // remember what RPG fired me.
+	pRocket->m_hLauncher = pLauncher; // remember what RPG fired me.
 	pLauncher->m_cActiveRockets++;	  // register this missile as active for the launcher
 	pRocket->pev->owner = pOwner->edict();
 

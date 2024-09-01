@@ -75,6 +75,7 @@ float EV_HLDM_PlayTextureSound(int idx, pmtrace_t* ptr, float* vecSrc, float* ve
 {
 	// hit the world, try to play sound based on texture material type
 	char chTextureType = CHAR_TEX_CONCRETE;
+	cl_entity_t* cl_entity = NULL;
 	float fvol;
 	float fvolbar;
 	const char* rgsz[4];
@@ -93,12 +94,7 @@ float EV_HLDM_PlayTextureSound(int idx, pmtrace_t* ptr, float* vecSrc, float* ve
 	chTextureType = 0;
 
 	// Player
-	if (entity >= 1 && entity <= gEngfuncs.GetMaxClients())
-	{
-		// hit body
-		chTextureType = CHAR_TEX_FLESH;
-	}
-	else if (entity == 0)
+	if (entity == 0)
 	{
 		// get texture from entity or world (world is ent(0))
 		pTextureName = (char*)gEngfuncs.pEventAPI->EV_TraceTexture(ptr->ent, vecSrc, vecEnd);
@@ -126,6 +122,20 @@ float EV_HLDM_PlayTextureSound(int idx, pmtrace_t* ptr, float* vecSrc, float* ve
 			// get texture type
 			chTextureType = PM_FindTextureType(szbuffer);
 		}
+	}
+	else
+	{
+		// JoshA: Look up the entity and find the EFLAG_FLESH_SOUND flag.
+		// This broke at some point then TF:C added prediction.
+		//
+		// It used to use Classify of pEntity->Classify() != CLASS_NONE && pEntity->Classify() != CLASS_MACHINE
+		// to determine what sound to play, but that's server side and isn't available on the client
+		// and got lost in the translation to that.
+		// Now the server will replicate that state via an eflag.
+		cl_entity = gEngfuncs.GetEntityByIndex(entity);
+
+		if (cl_entity && !!(cl_entity->curstate.eflags & EFLAG_FLESH_SOUND))
+			chTextureType = CHAR_TEX_FLESH;
 	}
 
 	switch (chTextureType)
@@ -411,7 +421,16 @@ void EV_HLDM_FireBullets(int idx, float* forward, float* right, float* up, int c
 		gEngfuncs.pEventAPI->EV_SetSolidPlayers(idx - 1);
 
 		gEngfuncs.pEventAPI->EV_SetTraceHull(2);
-		gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_STUDIO_BOX, -1, &tr);
+		// JoshA: Changed from PM_STUDIO_BOX to PM_NORMAL in prediction code as otherwise if you hit an NPC or player's
+		// bounding box but not one of their hitboxes, the shot won't hit on the server but it will
+		// play a hit sound on the client and not make a decal (as if it hit the NPC/player).
+		// We should mirror the way the server does the test here as close as possible.
+		//
+		// I initially thought I was just fixing some stupid Half-Life bug but no,
+		// this is *the* root cause of all the ghost shot bad prediction bugs in Half-Life Deathmatch!
+		//
+		// Also... CStrike was always using PM_NORMAL for all of these so it didn't have the problem.
+		gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_NORMAL, -1, &tr);
 
 		EV_HLDM_CheckTracer(idx, vecSrc, tr.endpos, forward, right, iBulletType, iTracerFreq, tracerCount);
 
@@ -919,7 +938,7 @@ void EV_FireGauss(event_args_t* args)
 		gEngfuncs.pEventAPI->EV_SetSolidPlayers(idx - 1);
 
 		gEngfuncs.pEventAPI->EV_SetTraceHull(2);
-		gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecDest, PM_STUDIO_BOX, -1, &tr);
+		gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecDest, PM_NORMAL, -1, &tr);
 
 		gEngfuncs.pEventAPI->EV_PopPMStates();
 
@@ -1038,7 +1057,7 @@ void EV_FireGauss(event_args_t* args)
 					gEngfuncs.pEventAPI->EV_SetSolidPlayers(idx - 1);
 
 					gEngfuncs.pEventAPI->EV_SetTraceHull(2);
-					gEngfuncs.pEventAPI->EV_PlayerTrace(start, vecDest, PM_STUDIO_BOX, -1, &beam_tr);
+					gEngfuncs.pEventAPI->EV_PlayerTrace(start, vecDest, PM_NORMAL, -1, &beam_tr);
 
 					if (0 == beam_tr.allsolid)
 					{
@@ -1047,7 +1066,7 @@ void EV_FireGauss(event_args_t* args)
 
 						// trace backwards to find exit point
 
-						gEngfuncs.pEventAPI->EV_PlayerTrace(beam_tr.endpos, tr.endpos, PM_STUDIO_BOX, -1, &beam_tr);
+						gEngfuncs.pEventAPI->EV_PlayerTrace(beam_tr.endpos, tr.endpos, PM_NORMAL, -1, &beam_tr);
 
 						VectorSubtract(beam_tr.endpos, tr.endpos, delta);
 
@@ -1214,7 +1233,7 @@ void EV_FireCrossbow2(event_args_t* args)
 	// Now add in all of the players.
 	gEngfuncs.pEventAPI->EV_SetSolidPlayers(idx - 1);
 	gEngfuncs.pEventAPI->EV_SetTraceHull(2);
-	gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_STUDIO_BOX, -1, &tr);
+	gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_NORMAL, -1, &tr);
 
 	//We hit something
 	if (tr.fraction < 1.0)
@@ -1324,17 +1343,6 @@ int g_fireAnims2[] = {EGON_ALTFIRECYCLE};
 
 BEAM* pBeam;
 BEAM* pBeam2;
-TEMPENTITY* pFlare; // Vit_amiN: egon's beam flare
-
-void EV_EgonFlareCallback(struct tempent_s* ent, float frametime, float currenttime)
-{
-	float delta = currenttime - ent->tentOffset.z; // time past since the last scale
-	if (delta >= ent->tentOffset.y)
-	{
-		ent->entity.curstate.scale += ent->tentOffset.x * delta;
-		ent->tentOffset.z = currenttime;
-	}
-}
 
 void EV_EgonFire(event_args_t* args)
 {
@@ -1372,7 +1380,7 @@ void EV_EgonFire(event_args_t* args)
 	if (EV_IsLocal(idx))
 		gEngfuncs.pEventAPI->EV_WeaponAnimation(g_fireAnims1[gEngfuncs.pfnRandomLong(0, 3)], 0);
 
-	if (iStartup && EV_IsLocal(idx) && !pBeam && !pBeam2 && !pFlare && 0 != cl_lw->value) //Adrian: Added the cl_lw check for those lital people that hate weapon prediction.
+	if (iStartup && EV_IsLocal(idx) && !pBeam && !pBeam2 && 0 != cl_lw->value) //Adrian: Added the cl_lw check for those lital people that hate weapon prediction.
 	{
 		Vector vecSrc, vecEnd, angles, forward, right, up;
 		pmtrace_t tr;
@@ -1398,7 +1406,7 @@ void EV_EgonFire(event_args_t* args)
 			gEngfuncs.pEventAPI->EV_SetSolidPlayers(idx - 1);
 
 			gEngfuncs.pEventAPI->EV_SetTraceHull(2);
-			gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_STUDIO_BOX, -1, &tr);
+			gEngfuncs.pEventAPI->EV_PlayerTrace(vecSrc, vecEnd, PM_NORMAL, -1, &tr);
 
 			gEngfuncs.pEventAPI->EV_PopPMStates();
 
@@ -1422,17 +1430,7 @@ void EV_EgonFire(event_args_t* args)
 				pBeam->flags |= (FBEAM_SINENOISE);
 
 			pBeam2 = gEngfuncs.pEfxAPI->R_BeamEntPoint(idx | 0x1000, tr.endpos, iBeamModelIndex, 99999, 5.0, 0.08, 0.7, 25, 0, 0, r, g, b);
-
-			// Vit_amiN: egon beam flare
-			pFlare = gEngfuncs.pEfxAPI->R_TempSprite(tr.endpos, vec3_origin, 1.0,
-				gEngfuncs.pEventAPI->EV_FindModelIndex(EGON_FLARE_SPRITE),
-				kRenderGlow, kRenderFxNoDissipation, 1.0, 99999, FTENT_SPRCYCLE | FTENT_PERSIST);
 		}
-	}
-
-	if (pFlare) // Vit_amiN: store the last mode for EV_EgonStop()
-	{
-		pFlare->tentOffset.x = (iFireMode == FIRE_WIDE) ? 1.0f : 0.0f;
 	}
 }
 
@@ -1465,26 +1463,6 @@ void EV_EgonStop(event_args_t* args)
 		{
 			pBeam2->die = 0.0;
 			pBeam2 = NULL;
-		}
-
-		if (pFlare) // Vit_amiN: egon beam flare
-		{
-			pFlare->die = gEngfuncs.GetClientTime();
-
-			if (gEngfuncs.GetMaxClients() == 1 || (pFlare->flags & FTENT_NOMODEL) == 0)
-			{
-				if (pFlare->tentOffset.x != 0.0f) // true for iFireMode == FIRE_WIDE
-				{
-					pFlare->callback = &EV_EgonFlareCallback;
-					pFlare->fadeSpeed = 2.0;			// fade out will take 0.5 sec
-					pFlare->tentOffset.x = 10.0;		// scaling speed per second
-					pFlare->tentOffset.y = 0.1;			// min time between two scales
-					pFlare->tentOffset.z = pFlare->die; // the last callback run time
-					pFlare->flags = FTENT_FADEOUT | FTENT_CLIENTCUSTOM;
-				}
-			}
-
-			pFlare = NULL;
 		}
 
 		// HACK: only reset animation if the Egon is still equipped.

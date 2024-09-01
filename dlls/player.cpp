@@ -852,7 +852,7 @@ void CBasePlayer::Killed(entvars_t* pevAttacker, int iGib)
 
 	SetAnimation(PLAYER_DIE);
 
-	m_iRespawnFrames = 0;
+	m_flRespawnTimer = 0.0f;
 
 	pev->modelindex = g_ulModelIndexPlayer; // don't use eyes
 
@@ -1015,6 +1015,8 @@ void CBasePlayer::SetAnimation(PLAYER_ANIM playerAnim)
 		// Already using the desired animation?
 		if (pev->sequence == animDesired)
 			return;
+
+		//ALERT(at_console, "Set die animation to %d\n", animDesired);
 
 		pev->gaitsequence = 0;
 		pev->sequence = animDesired;
@@ -1299,18 +1301,27 @@ void CBasePlayer::PlayerDeathThink()
 	{
 		StudioFrameAdvance();
 
-		m_iRespawnFrames++;			// Note, these aren't necessarily real "frames", so behavior is dependent on # of client movement commands
-		if (m_iRespawnFrames < 120) // Animations should be no longer than this
+		m_flRespawnTimer += gpGlobals->frametime;
+		if (m_flRespawnTimer < 4.0f) // 120 frames at 30 fps -- animations should be no longer than this
 			return;
+	}
+
+	if (pev->deadflag == DEAD_DYING)
+	{
+		// Once we finish animating, if we're in multiplayer just make a copy of our body right away.
+		if (m_fSequenceFinished && g_pGameRules->IsMultiplayer() && pev->movetype == MOVETYPE_NONE)
+		{
+			CopyToBodyQue(pev);
+			pev->modelindex = 0;
+		}
+
+		pev->deadflag = DEAD_DEAD;
 	}
 
 	// once we're done animating our death and we're on the ground, we want to set movetype to None so our dead body won't do collisions and stuff anymore
 	// this prevents a bug where the dead body would go to a player's head if he walked over it while the dead player was clicking their button to respawn
 	if (pev->movetype != MOVETYPE_NONE && FBitSet(pev->flags, FL_ONGROUND))
 		pev->movetype = MOVETYPE_NONE;
-
-	if (pev->deadflag == DEAD_DYING)
-		pev->deadflag = DEAD_DEAD;
 
 	StopAnimation();
 
@@ -1351,7 +1362,7 @@ void CBasePlayer::PlayerDeathThink()
 		return;
 
 	pev->button = 0;
-	m_iRespawnFrames = 0;
+	m_flRespawnTimer = 0.0f;
 
 	//ALERT(at_console, "Respawn\n");
 
@@ -2845,17 +2856,17 @@ pt_end:
 
 				if (gun && gun->UseDecrement())
 				{
-					gun->m_flNextPrimaryAttack = V_max(gun->m_flNextPrimaryAttack - gpGlobals->frametime, -1.1);
-					gun->m_flNextSecondaryAttack = V_max(gun->m_flNextSecondaryAttack - gpGlobals->frametime, -0.001);
+					gun->m_flNextPrimaryAttack = V_max(gun->m_flNextPrimaryAttack - gpGlobals->frametime, -1.0f);
+					gun->m_flNextSecondaryAttack = V_max(gun->m_flNextSecondaryAttack - gpGlobals->frametime, -0.001f);
 
 					if (gun->m_flTimeWeaponIdle != 1000)
 					{
-						gun->m_flTimeWeaponIdle = V_max(gun->m_flTimeWeaponIdle - gpGlobals->frametime, -0.001);
+						gun->m_flTimeWeaponIdle = V_max(gun->m_flTimeWeaponIdle - gpGlobals->frametime, -0.001f);
 					}
 
 					if (gun->pev->fuser1 != 1000)
 					{
-						gun->pev->fuser1 = V_max(gun->pev->fuser1 - gpGlobals->frametime, -0.001);
+						gun->pev->fuser1 = V_max(gun->pev->fuser1 - gpGlobals->frametime, -0.001f);
 					}
 
 					gun->DecrementTimers();
@@ -3083,6 +3094,7 @@ ReturnSpot:
 
 void CBasePlayer::Spawn()
 {
+	m_flStartCharge = gpGlobals->time;
 	m_bIsSpawning = true;
 
 	//Make sure this gets reset even if somebody adds an early return or throws an exception.
@@ -4858,7 +4870,7 @@ Vector CBasePlayer::GetAutoaimVectorFromPoint(const Vector& vecSrc, float flDelt
 	// m_vecAutoAim = m_vecAutoAim * 0.99;
 
 	// Don't send across network if sv_aim is 0
-	if (g_psv_aim->value != 0)
+	if (g_psv_aim->value != 0 && g_psv_allow_autoaim != 0)
 	{
 		if (m_vecAutoAim.x != m_lastx ||
 			m_vecAutoAim.y != m_lasty)
@@ -4889,7 +4901,7 @@ Vector CBasePlayer::AutoaimDeflection(const Vector& vecSrc, float flDist, float 
 	edict_t* bestent;
 	TraceResult tr;
 
-	if (g_psv_aim->value == 0)
+	if (g_psv_aim->value == 0 || g_psv_allow_autoaim->value == 0)
 	{
 		m_fOnTarget = false;
 		return g_vecZero;

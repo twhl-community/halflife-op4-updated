@@ -491,6 +491,10 @@ void CBasePlayerItem::FallThink()
 
 		Materialize();
 	}
+	else if (m_pPlayer != NULL)
+	{
+		SetThink(NULL);
+	}
 }
 
 //=========================================================
@@ -1066,7 +1070,7 @@ void CBasePlayerWeapon::DoRetireWeapon()
 //=========================================================================
 float CBasePlayerWeapon::GetNextAttackDelay(float delay)
 {
-	if (m_flLastFireTime == 0 || m_flNextPrimaryAttack <= -1.1)
+	if (m_flLastFireTime == 0 || m_flNextPrimaryAttack == -1)
 	{
 		// At this point, we are assuming that the client has stopped firing
 		// and we are going to reset our book keeping variables.
@@ -1445,7 +1449,7 @@ IMPLEMENT_SAVERESTORE(CRpg, CBasePlayerWeapon);
 TYPEDESCRIPTION CRpgRocket::m_SaveData[] =
 	{
 		DEFINE_FIELD(CRpgRocket, m_flIgniteTime, FIELD_TIME),
-		DEFINE_FIELD(CRpgRocket, m_pLauncher, FIELD_EHANDLE),
+		DEFINE_FIELD(CRpgRocket, m_hLauncher, FIELD_EHANDLE),
 };
 IMPLEMENT_SAVERESTORE(CRpgRocket, CGrenade);
 
