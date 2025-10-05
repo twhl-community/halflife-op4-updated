@@ -830,7 +830,7 @@ void COFGonome::SetActivity(Activity NewActivity)
 	case ACT_MELEE_ATTACK1:
 		if (m_hEnemy)
 		{
-			if ((pev->origin - m_hEnemy->pev->origin).Length() >= 48)
+			if ((pev->origin - m_hEnemy->pev->origin).Length2D() >= 48)
 			{
 				iSequence = LookupSequence("attack1");
 			}
