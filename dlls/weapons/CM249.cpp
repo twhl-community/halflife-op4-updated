@@ -178,7 +178,7 @@ void CM249::PrimaryAttack()
 
 	if (UTIL_IsMultiplayer())
 	{
-		if ((m_pPlayer->pev->button & IN_DUCK) != 0)
+		if (FBitSet(m_pPlayer->pev->flags, FL_DUCKING) && FBitSet(m_pPlayer->pev->flags, FL_ONGROUND))
 		{
 			vecSpread = VECTOR_CONE_3DEGREES;
 		}
@@ -196,7 +196,7 @@ void CM249::PrimaryAttack()
 	}
 	else
 	{
-		if ((m_pPlayer->pev->button & IN_DUCK) != 0)
+		if (FBitSet(m_pPlayer->pev->flags, FL_DUCKING) && FBitSet(m_pPlayer->pev->flags, FL_ONGROUND))
 		{
 			vecSpread = VECTOR_CONE_2DEGREES;
 		}
