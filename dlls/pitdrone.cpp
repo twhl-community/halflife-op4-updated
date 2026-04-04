@@ -514,7 +514,10 @@ void CPitdrone::HandleAnimEvent(MonsterEvent_t* pEvent)
 			// we should be able to read the position of bones at runtime for this info.
 			vecSpitOffset = (gpGlobals->v_forward * 15 + gpGlobals->v_up * 36);
 			vecSpitOffset = (pev->origin + vecSpitOffset);
-			vecSpitDir = ((m_hEnemy->pev->origin + m_hEnemy->pev->view_ofs) - vecSpitOffset).Normalize();
+			if (m_hEnemy) // fixes crash
+				vecSpitDir = ((m_hEnemy->pev->origin + m_hEnemy->pev->view_ofs) - vecSpitOffset).Normalize();
+			else
+				vecSpitDir = gpGlobals->v_forward;
 
 			vecSpitDir.x += RANDOM_FLOAT(-0.05, 0.05);
 			vecSpitDir.y += RANDOM_FLOAT(-0.05, 0.05);
