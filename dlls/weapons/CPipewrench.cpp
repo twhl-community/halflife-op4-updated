@@ -352,6 +352,8 @@ void CPipewrench::BigSwing()
 	}
 	else
 	{
+		m_pPlayer->pev->punchangle.x += 2.0f;
+
 		SendWeaponAnim(PIPEWRENCH_BIG_SWING_HIT);
 
 		// player "shoot" animation
